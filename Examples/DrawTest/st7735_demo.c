@@ -47,11 +47,11 @@ int main(void)
 
     tft_fill_rect(0, 0, 160, 80, BLACK);
 
-    tft_set_color(RED);
-    tft_set_background_color(BLACK);
-
     while (1)
     {
+        tft_set_color(RED);
+        tft_set_background_color(BLACK);
+
         popup("Draw Point", 1000);
         tft_fill_rect(0, 0, 160, 80, BLACK);
 
@@ -118,6 +118,33 @@ int main(void)
         while (frame-- > 0)
         {
             tft_fill_rect(rand8() % 140, rand8() % 60, 20, 20, colors[rand8() % 19]);
+        }
+
+        popup("Move Text", 1000);
+        tft_fill_rect(0, 0, 160, 80, BLACK);
+
+        frame     = 500;
+        uint8_t x = 0, y = 0, step_x = 1, step_y = 1;
+        while (frame-- > 0)
+        {
+            uint16_t bg = colors[rand8() % 19];
+            tft_fill_rect(x, y, 88, 17, bg);
+            tft_set_color(colors[rand8() % 19]);
+            tft_set_background_color(bg);
+            tft_set_cursor(x + 5, y + 5);
+            tft_print("Hello, World!");
+            Delay_Ms(25);
+
+            x += step_x;
+            if (x >= 72)
+            {
+                step_x = -step_x;
+            }
+            y += step_y;
+            if (y >= 63)
+            {
+                step_y = -step_y;
+            }
         }
     }
 }
