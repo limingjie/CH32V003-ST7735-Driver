@@ -161,7 +161,7 @@ void tft_init(void)
 
 ## Known Issue
 
-- [ ] The CS pin does not work understand PlatformIO. Pull the CS pin to ground as a temporary solution.
+- [x] (Fixed) ~~The CS pin does not work understand PlatformIO. Pull the CS pin to ground as a temporary solution.~~
 
 ## CH32V003 Development Guide
 
