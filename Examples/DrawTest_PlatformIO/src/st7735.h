@@ -64,7 +64,7 @@
 void tft_init(void);
 
 // Text functions
-void tft_set_cursor(uint8_t x, uint8_t y);
+void tft_set_cursor(uint16_t x, uint16_t y);
 void tft_set_color(uint16_t color);
 void tft_set_background_color(uint16_t color);
 void tft_print_char(char c);
@@ -72,10 +72,10 @@ void tft_print(const char* str);
 void tft_print_number(int32_t num);
 
 // Drawing functions
-void tft_draw_pixel(uint8_t x, uint8_t y, uint16_t color);
+void tft_draw_pixel(uint16_t x, uint16_t y, uint16_t color);
 void tft_draw_line(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
-void tft_draw_rect(uint8_t x, uint8_t y, uint8_t width, uint8_t height, uint16_t color);
-void tft_fill_rect(uint8_t x, uint8_t y, uint8_t width, uint8_t height, uint16_t color);
-void tft_draw_bitmap(uint8_t x, uint8_t y, uint8_t width, uint8_t height, const uint8_t* bitmap);
+void tft_draw_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t color);
+void tft_fill_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t color);
+void tft_draw_bitmap(uint16_t x, uint16_t y, uint16_t width, uint16_t height, const uint8_t* bitmap);
 
 #endif  // __ST7735_H__

@@ -42,16 +42,16 @@
 #define SPI_SCLK 5  // PC5
 #define SPI_MOSI 6  // PC6
 
-#define SEND_DATA()    (GPIOC->BSHR |= 1 << PIN_DC)  // DC High
-#define SEND_COMMAND() (GPIOC->BCR |= 1 << PIN_DC)   // DC Low
+#define DATA_MODE()    (GPIOC->BSHR |= 1 << PIN_DC)  // DC High
+#define COMMAND_MODE() (GPIOC->BCR |= 1 << PIN_DC)   // DC Low
 #define RESET_HIGH()   (GPIOC->BSHR |= 1 << PIN_RESET)
 #define RESET_LOW()    (GPIOC->BCR |= 1 << PIN_RESET)
 #ifndef ST7735_NO_CS
     #define BEGIN_WRITE() (GPIOC->BCR |= 1 << PIN_CS)   // CS Low
     #define END_WRITE()   (GPIOC->BSHR |= 1 << PIN_CS)  // CS High
 #else
-    #define BEGIN_WRITE() (void)0
-    #define END_WRITE()   (void)0
+    #define BEGIN_WRITE()
+    #define END_WRITE()
 #endif
 
 #define ST7735_RST_DELAY    50   // delay ms wait for reset finish
@@ -87,15 +87,15 @@
     #define GPIO_CNF_OUT_PP_AF 0x08
 #endif
 
-static uint8_t  _cursor_x                 = 0;
-static uint8_t  _cursor_y                 = 0;      // Cursor position (x, y)
+static uint16_t _cursor_x                 = 0;
+static uint16_t _cursor_y                 = 0;      // Cursor position (x, y)
 static uint16_t _color                    = BLACK;  // Color
 static uint16_t _bg_color                 = WHITE;  // Background color
 static uint8_t  buffer[ST7735_WIDTH << 1] = {0};    // DMA buffer, long enough to fill a row.
 
 static void SPI_init(void)
 {
-    // Enable GPIO Port C and SPI
+    // Enable GPIO Port C and SPI peripheral
     RCC->APB2PCENR |= RCC_APB2Periph_GPIOC | RCC_APB2Periph_SPI1;
 
     // PC2 - RESET
@@ -121,21 +121,30 @@ static void SPI_init(void)
     GPIOC->CFGLR |= (GPIO_CNF_OUT_PP_AF | GPIO_Speed_50MHz) << (SPI_MOSI << 2);
 
     // Configure SPI
-    SPI1->CTLR1 = SPI_NSS_Soft | SPI_CPHA_1Edge | SPI_CPOL_Low | SPI_DataSize_8b | SPI_Mode_Master |
-                  SPI_Direction_1Line_Tx | SPI_BaudRatePrescaler_2 | SPI_FirstBit_MSB;
-    SPI1->CRCR = 7;
-    // Configure SPI DMA Transfer
-    SPI1->CTLR2 |= SPI_I2S_DMAReq_Tx;
-    // Enable SPI
-    SPI1->CTLR1 |= CTLR1_SPE_Set;
+    SPI1->CTLR1 = SPI_CPHA_1Edge             // Bit 0     - Clock PHAse
+                  | SPI_CPOL_Low             // Bit 1     - Clock POLarity - idles at the logical low voltage
+                  | SPI_Mode_Master          // Bit 2     - Master device
+                  | SPI_BaudRatePrescaler_2  // Bit 3-5   - F_HCLK / 2
+                  | SPI_FirstBit_MSB         // Bit 7     - MSB transmitted first
+                  | SPI_NSS_Soft             // Bit 9     - Software slave management
+                  | SPI_DataSize_8b          // Bit 11    - 8-bit data
+                  | SPI_Direction_1Line_Tx;  // Bit 14-15 - 1-line SPI, transmission only
+    SPI1->CRCR = 7;                          // CRC
+    SPI1->CTLR2 |= SPI_I2S_DMAReq_Tx;        // Configure SPI DMA Transfer
+    SPI1->CTLR1 |= CTLR1_SPE_Set;            // Bit 6     - Enable SPI
 
-    // Enable DMA
+    // Enable DMA peripheral
     RCC->AHBPCENR |= RCC_AHBPeriph_DMA1;
 
-    // Config DMA
-    DMA1_Channel3->CFGR |= DMA_DIR_PeripheralDST | DMA_Mode_Circular | DMA_PeripheralInc_Disable |
-                           DMA_MemoryInc_Enable | DMA_PeripheralDataSize_Byte | DMA_MemoryDataSize_Byte |
-                           DMA_Priority_VeryHigh | DMA_M2M_Disable;
+    // Config DMA for SPI TX
+    DMA1_Channel3->CFGR = DMA_DIR_PeripheralDST          // Bit 4     - Read from memory
+                          | DMA_Mode_Circular            // Bit 5     - Circulation mode
+                          | DMA_PeripheralInc_Disable    // Bit 6     - Peripheral address no change
+                          | DMA_MemoryInc_Enable         // Bit 7     - Increase memory address
+                          | DMA_PeripheralDataSize_Byte  // Bit 8-9   - 8-bit data
+                          | DMA_MemoryDataSize_Byte      // Bit 10-11 - 8-bit data
+                          | DMA_Priority_VeryHigh        // Bit 12-13 - Very high priority
+                          | DMA_M2M_Disable;             // Bit 14    - Disable memory to memory mode
     DMA1_Channel3->PADDR = (uint32_t)&SPI1->DATAR;
 }
 
@@ -144,20 +153,20 @@ static void SPI_send_DMA(const uint8_t* buffer, uint16_t size, uint16_t repeat)
 {
     DMA1_Channel3->MADDR = (uint32_t)buffer;
     DMA1_Channel3->CNTR  = size;
-    DMA1_Channel3->CFGR |= DMA_CFGR1_EN;
+    DMA1_Channel3->CFGR |= DMA_CFGR1_EN;  // Turn on channel
 
     // Circulate the buffer
     while (repeat--)
     {
-        // Waiting for transmission complete
+        // Clear flag, start sending?
+        DMA1->INTFCR = DMA1_FLAG_TC3;
+
+        // Waiting for channel 3 transmission complete
         while (!(DMA1->INTFR & DMA1_FLAG_TC3))
             ;
-
-        // Clear flag
-        DMA1->INTFCR = DMA1_FLAG_TC3;
     }
 
-    DMA1_Channel3->CFGR &= (uint16_t)(~DMA_CFGR1_EN);
+    DMA1_Channel3->CFGR &= ~DMA_CFGR1_EN;  // Turn off channel
 }
 
 // Send data directly through SPI
@@ -174,29 +183,23 @@ static inline void SPI_send(uint8_t data)
 // Write command
 static void write_command_8(uint8_t cmd)
 {
-    BEGIN_WRITE();
-    SEND_COMMAND();
+    COMMAND_MODE();
     SPI_send(cmd);
-    END_WRITE();
 }
 
 // Write 8-bit data
 static void write_data_8(uint8_t data)
 {
-    BEGIN_WRITE();
-    SEND_DATA();
+    DATA_MODE();
     SPI_send(data);
-    END_WRITE();
 }
 
 // Write 16-bit data
 static void write_data_16(uint16_t data)
 {
-    BEGIN_WRITE();
-    SEND_DATA();
+    DATA_MODE();
     SPI_send(data >> 8);
     SPI_send(data);
-    END_WRITE();
 }
 
 void tft_init(void)
@@ -208,6 +211,8 @@ void tft_init(void)
     Delay_Ms(ST7735_RST_DELAY);
     RESET_HIGH();
     Delay_Ms(ST7735_RST_DELAY);
+
+    BEGIN_WRITE();
 
     // Out of sleep mode, no args, w/delay
     write_command_8(ST7735_SLPOUT);
@@ -226,19 +231,19 @@ void tft_init(void)
 
     // Gamma Adjustments (pos. polarity), 16 args.
     // (Not entirely necessary, but provides accurate colors)
+    uint8_t gamma_p[] = {0x09, 0x16, 0x09, 0x20, 0x21, 0x1B, 0x13, 0x19,
+                         0x17, 0x15, 0x1E, 0x2B, 0x04, 0x05, 0x02, 0x0E};
     write_command_8(ST7735_GMCTRP1);
-    write_data_8(0x09), write_data_8(0x16), write_data_8(0x09), write_data_8(0x20);
-    write_data_8(0x21), write_data_8(0x1B), write_data_8(0x13), write_data_8(0x19);
-    write_data_8(0x17), write_data_8(0x15), write_data_8(0x1E), write_data_8(0x2B);
-    write_data_8(0x04), write_data_8(0x05), write_data_8(0x02), write_data_8(0x0E);
+    DATA_MODE();
+    SPI_send_DMA(gamma_p, 16, 1);
 
     // Gamma Adjustments (neg. polarity), 16 args.
     // (Not entirely necessary, but provides accurate colors)
+    uint8_t gamma_n[] = {0x0B, 0x14, 0x08, 0x1E, 0x22, 0x1D, 0x18, 0x1E,
+                         0x1B, 0x1A, 0x24, 0x2B, 0x06, 0x06, 0x02, 0x0F};
     write_command_8(ST7735_GMCTRN1);
-    write_data_8(0x0B), write_data_8(0x14), write_data_8(0x08), write_data_8(0x1E);
-    write_data_8(0x22), write_data_8(0x1D), write_data_8(0x18), write_data_8(0x1E);
-    write_data_8(0x1B), write_data_8(0x1A), write_data_8(0x24), write_data_8(0x2B);
-    write_data_8(0x06), write_data_8(0x06), write_data_8(0x02), write_data_8(0x0F);
+    DATA_MODE();
+    SPI_send_DMA(gamma_n, 16, 1);
 
     Delay_Ms(10);
 
@@ -253,9 +258,11 @@ void tft_init(void)
     // Main screen turn on, no args, w/delay
     write_command_8(ST7735_DISPON);
     Delay_Ms(10);
+
+    END_WRITE();
 }
 
-void tft_set_cursor(uint8_t x, uint8_t y)
+void tft_set_cursor(uint16_t x, uint16_t y)
 {
     _cursor_x = x + ST7735_X_OFFSET;
     _cursor_y = y + ST7735_Y_OFFSET;
@@ -271,39 +278,44 @@ void tft_set_background_color(uint16_t color)
     _bg_color = color;
 }
 
-static void tft_set_window(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1)
+static void tft_set_window(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
 {
     write_command_8(ST7735_CASET);
-    write_data_8(x0 >> 8);
-    write_data_8(x0 & 0xFF);
-    write_data_8(x1 >> 8);
-    write_data_8(x1 & 0xFF);
+    write_data_16(x0);
+    write_data_16(x1);
     write_command_8(ST7735_RASET);
-    write_data_8(y0 >> 8);
-    write_data_8(y0 & 0xFF);
-    write_data_8(y1 >> 8);
-    write_data_8(y1 & 0xFF);
+    write_data_16(y0);
+    write_data_16(y1);
     write_command_8(ST7735_RAMWR);
 }
 
 void tft_print_char(char c)
 {
-    tft_set_window(_cursor_x, _cursor_y, _cursor_x + 4, _cursor_x + 6);
     const unsigned char* start = &font[c + (c << 2)];
+
+    uint16_t sz = 0;
     for (uint8_t i = 0; i < 7; i++)
     {
         for (uint8_t j = 0; j < 5; j++)
         {
             if ((*(start + j)) & (0x01 << i))
             {
-                write_data_16(_color);
+                buffer[sz++] = _color >> 8;
+                buffer[sz++] = _color;
             }
             else
             {
-                write_data_16(_bg_color);
+                buffer[sz++] = _bg_color >> 8;
+                buffer[sz++] = _bg_color;
             }
         }
     }
+
+    BEGIN_WRITE();
+    tft_set_window(_cursor_x, _cursor_y, _cursor_x + 4, _cursor_x + 6);
+    DATA_MODE();
+    SPI_send_DMA(buffer, sz, 1);
+    END_WRITE();
 }
 
 void tft_print(const char* str)
@@ -354,42 +366,84 @@ void tft_print_number(int32_t num)
     tft_print(str);
 }
 
-void tft_draw_pixel(uint8_t x, uint8_t y, uint16_t color)
+void tft_draw_pixel(uint16_t x, uint16_t y, uint16_t color)
 {
     x += ST7735_X_OFFSET;
     y += ST7735_Y_OFFSET;
+    BEGIN_WRITE();
     tft_set_window(x, y, x, y);
     write_data_16(color);
-}
-
-void tft_fill_rect(uint8_t x, uint8_t y, uint8_t width, uint8_t height, uint16_t color)
-{
-    x += ST7735_X_OFFSET;
-    y += ST7735_Y_OFFSET;
-    tft_set_window(x, y, x + width - 1, y + height - 1);
-
-    uint16_t i = 0;
-    for (uint8_t x = 0; x < width; x++)
-    {
-        buffer[i++] = color >> 8;
-        buffer[i++] = color;
-    }
-
-    BEGIN_WRITE();
-    SEND_DATA();
-    SPI_send_DMA(buffer, width << 1, height);
     END_WRITE();
 }
 
-void tft_draw_bitmap(uint8_t x, uint8_t y, uint8_t width, uint8_t height, const uint8_t* bitmap)
+void tft_fill_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t color)
 {
     x += ST7735_X_OFFSET;
     y += ST7735_Y_OFFSET;
-    tft_set_window(x, y, x + width - 1, y + height - 1);
+
+    uint16_t sz = 0;
+    for (uint16_t x = 0; x < width; x++)
+    {
+        buffer[sz++] = color >> 8;
+        buffer[sz++] = color;
+    }
 
     BEGIN_WRITE();
-    SEND_DATA();
+    tft_set_window(x, y, x + width - 1, y + height - 1);
+    DATA_MODE();
+    SPI_send_DMA(buffer, sz, height);
+    END_WRITE();
+}
+
+void tft_draw_bitmap(uint16_t x, uint16_t y, uint16_t width, uint16_t height, const uint8_t* bitmap)
+{
+    x += ST7735_X_OFFSET;
+    y += ST7735_Y_OFFSET;
+    BEGIN_WRITE();
+    tft_set_window(x, y, x + width - 1, y + height - 1);
+    DATA_MODE();
     SPI_send_DMA(bitmap, width * height << 1, 1);
+    END_WRITE();
+}
+
+// The draw line fuctions from Arduino GFX
+// - https://github.com/moononournation/Arduino_GFX/blob/master/src/Arduino_GFX.cpp
+// Some functions are DMA accelerated.
+static void _tft_draw_fast_v_line(int16_t x, int16_t y, int16_t h, uint16_t color)
+{
+    x += ST7735_X_OFFSET;
+    y += ST7735_Y_OFFSET;
+
+    uint16_t sz = 0;
+    for (int16_t j = 0; j < h; j++)
+    {
+        buffer[sz++] = color >> 8;
+        buffer[sz++] = color;
+    }
+
+    BEGIN_WRITE();
+    tft_set_window(x, y, x, y + h - 1);
+    DATA_MODE();
+    SPI_send_DMA(buffer, sz, 1);
+    END_WRITE();
+}
+
+static void _tft_draw_fast_h_line(int16_t x, int16_t y, int16_t w, uint16_t color)
+{
+    x += ST7735_X_OFFSET;
+    y += ST7735_Y_OFFSET;
+
+    uint16_t sz = 0;
+    for (int16_t j = 0; j < w; j++)
+    {
+        buffer[sz++] = color >> 8;
+        buffer[sz++] = color;
+    }
+
+    BEGIN_WRITE();
+    tft_set_window(x, y, x + w - 1, y);
+    DATA_MODE();
+    SPI_send_DMA(buffer, sz, 1);
     END_WRITE();
 }
 
@@ -401,47 +455,6 @@ void tft_draw_bitmap(uint8_t x, uint8_t y, uint8_t width, uint8_t height, const 
         a         = b;      \
         b         = t;      \
     }
-
-// Draw line fuctions from Arduino GFX
-// https://github.com/moononournation/Arduino_GFX/blob/master/src/Arduino_GFX.cpp
-
-static void _tft_draw_fast_v_line(int16_t x, int16_t y, int16_t h, uint16_t color)
-{
-    x += ST7735_X_OFFSET;
-    y += ST7735_Y_OFFSET;
-    tft_set_window(x, y, x, y + h - 1);
-
-    uint16_t i = 0;
-    for (int16_t j = 0; j < h; j++)
-    {
-        buffer[i++] = color >> 8;
-        buffer[i++] = color;
-    }
-
-    BEGIN_WRITE();
-    SEND_DATA();
-    SPI_send_DMA(buffer, h << 1, 1);
-    END_WRITE();
-}
-
-static void _tft_draw_fast_h_line(int16_t x, int16_t y, int16_t w, uint16_t color)
-{
-    x += ST7735_X_OFFSET;
-    y += ST7735_Y_OFFSET;
-    tft_set_window(x, y, x + w - 1, y);
-
-    uint16_t i = 0;
-    for (int16_t j = 0; j < w; j++)
-    {
-        buffer[i++] = color >> 8;
-        buffer[i++] = color;
-    }
-
-    BEGIN_WRITE();
-    SEND_DATA();
-    SPI_send_DMA(buffer, w << 1, 1);
-    END_WRITE();
-}
 
 static void _tft_draw_line(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color)
 {
@@ -482,7 +495,7 @@ static void _tft_draw_line(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint1
     }
 }
 
-void tft_draw_rect(uint8_t x, uint8_t y, uint8_t width, uint8_t height, uint16_t color)
+void tft_draw_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t color)
 {
     _tft_draw_fast_h_line(x, y, width, color);
     _tft_draw_fast_h_line(x, y + height - 1, width, color);
