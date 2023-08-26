@@ -727,20 +727,8 @@ int main(void)
     while (1)
     {
         tft_set_color(RED);
-        tft_set_cursor(94, 2);
-        tft_print("Go Mario!!!");
-        tft_set_color(BLUE);
-        tft_set_cursor(124, 12);
-        tft_print("Run!!!");
-        tft_set_color(ORANGE);
-        tft_set_cursor(82, 22);
-        tft_print("Hit Bricks!!!");
-        tft_set_color(PURPLE);
-        tft_set_cursor(82, 32);
-        tft_print("Beat Monsters");
-        tft_set_color(PINK);
-        tft_set_cursor(70, 42);
-        tft_print("Rescue Princess");
+        tft_set_cursor(28, 2);
+        tft_print("Mario! Rescue Princess");
 
         tft_draw_bitmap(frames[frame].pos_x + shift, frames[frame].pos_y, frames[frame].width, frames[frame].height,
                         frames[frame].bitmap);
@@ -748,13 +736,10 @@ int main(void)
         tft_fill_rect(frames[frame].pos_x + shift, frames[frame].pos_y, frames[frame].width, frames[frame].height,
                       BLACK);
 
-        if (frame != 0 && frame != 9 && frame != 10)
+        shift += 4;
+        if (shift >= 120)
         {
-            shift += 4;
-            if (shift >= 120)
-            {
-                shift = 0;
-            }
+            shift = 0;
         }
 
         if (++frame >= 11)
