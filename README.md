@@ -175,7 +175,7 @@ void tft_init(void)
 
 ## License
 
-![CC by-nc-sa](images/by-nc-sa.png)
+![CC by-nc-sa](images/by-nc-sa.svg)
 
 This work is licensed under a [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 
