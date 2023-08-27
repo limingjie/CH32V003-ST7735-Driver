@@ -12,25 +12,6 @@
 ///  - https://github.com/cnlohr/ch32v003fun/tree/master/examples/spi_oled
 ///
 /// \copyright Attribution-NonCommercial-ShareAlike 4.0 (CC BY-NC-SA 4.0)
-///  - Attribution - You must give appropriate credit, provide a link to the
-///    license, and indicate if changes were made. You may do so in any
-///    reasonable manner, but not in any way that suggests the licensor endorses
-///    you or your use.
-///  - NonCommercial - You may not use the material for commercial purposes.
-///  - ShareAlike - If you remix, transform, or build upon the material, you
-///    must distribute your contributions under the same license as the original.
-///
-/// \section Wiring
-/// | CH32V003       | ST7735    | Power | Description                       |
-/// | -------------- | --------- | ----- | --------------------------------- |
-/// |                | 1 - LEDA  | 3V3   | Use PWM to control brightness     |
-/// |                | 2 - GND   | GND   | GND                               |
-/// | PC2            | 3 - RESET |       | Reset                             |
-/// | PC3            | 4 - RS    |       | DC (Data / Command)               |
-/// | PC6 (SPI MOSI) | 5 - SDA   |       | SPI MOSI (Master Output Slave In) |
-/// | PC5 (SPI SCLK) | 6 - SCL   |       | SPI SCLK (Serial Clock)           |
-/// |                | 7 - VDD   | 3V3   | VDD                               |
-/// | PC4            | 8 - CS    |       | SPI CS/SS (Chip/Slave Select)     |
 
 #ifndef __ST7735_H__
 #define __ST7735_H__
@@ -96,7 +77,10 @@ void tft_print(const char* str);
 
 /// \brief Print an Integer
 /// \param num Number to print
-void tft_print_number(int32_t num);
+/// \param width Expected width of the number.
+/// Align left if it is less than the width of the number.
+/// Align right if it is greater than the width of the number.
+void tft_print_number(int32_t num, uint16_t width);
 
 /// \brief Draw a Pixel
 /// \param x X

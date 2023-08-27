@@ -12,25 +12,6 @@
 ///  - https://github.com/cnlohr/ch32v003fun/tree/master/examples/spi_oled
 ///
 /// \copyright Attribution-NonCommercial-ShareAlike 4.0 (CC BY-NC-SA 4.0)
-///  - Attribution - You must give appropriate credit, provide a link to the
-///    license, and indicate if changes were made. You may do so in any
-///    reasonable manner, but not in any way that suggests the licensor endorses
-///    you or your use.
-///  - NonCommercial - You may not use the material for commercial purposes.
-///  - ShareAlike - If you remix, transform, or build upon the material, you
-///    must distribute your contributions under the same license as the original.
-///
-/// \section Wiring
-/// | CH32V003       | ST7735    | Power | Description                       |
-/// | -------------- | --------- | ----- | --------------------------------- |
-/// |                | 1 - LEDA  | 3V3   | Use PWM to control brightness     |
-/// |                | 2 - GND   | GND   | GND                               |
-/// | PC2            | 3 - RESET |       | Reset                             |
-/// | PC3            | 4 - RS    |       | DC (Data / Command)               |
-/// | PC6 (SPI MOSI) | 5 - SDA   |       | SPI MOSI (Master Output Slave In) |
-/// | PC5 (SPI SCLK) | 6 - SCL   |       | SPI SCLK (Serial Clock)           |
-/// |                | 7 - VDD   | 3V3   | VDD                               |
-/// | PC4            | 8 - CS    |       | SPI CS/SS (Chip/Slave Select)     |
 
 #include "st7735.h"
 
@@ -372,7 +353,7 @@ void tft_print_char(char c)
     }
 
     START_WRITE();
-    tft_set_window(_cursor_x, _cursor_y, _cursor_x + FONT_WIDTH - 1, _cursor_x + FONT_HEIGHT - 1);
+    tft_set_window(_cursor_x, _cursor_y, _cursor_x + FONT_WIDTH - 1, _cursor_y + FONT_HEIGHT - 1);
     DATA_MODE();
     SPI_send_DMA(_buffer, sz, 1);
     END_WRITE();
@@ -391,43 +372,48 @@ void tft_print(const char* str)
 
 /// \brief Print an Integer
 /// \param num Number to print
-void tft_print_number(int32_t num)
+/// \param width Expected width of the number.
+/// Align left if it is less than the width of the number.
+/// Align right if it is greater than the width of the number.
+void tft_print_number(int32_t num, uint16_t width)
 {
     static char str[12];
-    uint8_t     digits = 11;
-    uint8_t     neg    = 0;
+    uint8_t     position  = 11;
+    uint8_t     negative  = 0;
+    uint16_t    num_width = 0;
 
     // Handle negative number
     if (num < 0)
     {
-        neg = 1;
-        num = -num;
+        negative = 1;
+        num      = -num;
     }
 
-    str[digits] = '\0';  // End of the string.
+    str[position] = '\0';  // End of the string.
     while (num)
     {
-        str[--digits] = num % 10 + '0';
+        str[--position] = num % 10 + '0';
         num /= 10;
     }
 
-    if (digits == 11)
+    if (position == 11)
     {
-        str[--digits] = '0';
+        str[--position] = '0';
     }
 
-    if (neg)
+    if (negative)
     {
-        str[--digits] = '-';
+        str[--position] = '-';
     }
 
-    // Fill in spaces
-    while (digits)
+    // Calculate alignment
+    num_width = (11 - position) * (FONT_WIDTH + 1) - 1;
+    if (width > num_width)
     {
-        str[--digits] = ' ';
+        _cursor_x += width - num_width;
     }
 
-    tft_print(str);
+    tft_print(&str[position]);
 }
 
 /// \brief Draw a Pixel

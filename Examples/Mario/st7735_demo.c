@@ -673,7 +673,7 @@ int main(void)
         tft_set_cursor(124, 70);
         tft_print("Frames");
         tft_set_cursor(52, 70);
-        tft_print_number(count++);
+        tft_print_number(count++, 65);
 
         p_frame = &frames[frame];
 

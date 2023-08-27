@@ -17,7 +17,7 @@ DMA is used to accelerate the data transmission where possible.
     - [RGB Color Macro](#rgb-color-macro)
     - [Set Rotation and RGB Ordering](#set-rotation-and-rgb-ordering)
     - [Invert Colors](#invert-colors)
-  - [Known Issue](#known-issue)
+  - [Known Issues](#known-issues)
   - [CH32V003 Development Guide](#ch32v003-development-guide)
   - [References](#references)
   - [License](#license)
@@ -26,16 +26,20 @@ DMA is used to accelerate the data transmission where possible.
 
 ### Wiring
 
-| CH32V003         | ST7735      | Power | Description                       |
-| ---------------- | ----------- | ----- | --------------------------------- |
-|                  | 1 - `LEDA`  | `3V3` | Use PWM to control brightness     |
-|                  | 2 - `GND`   | `GND` | GND                               |
-| `PC2`            | 3 - `RESET` |       | Reset                             |
-| `PC3`            | 4 - `RS`    |       | DC (Data / Command)               |
-| `PC6` (SPI MOSI) | 5 - `SDA`   |       | SPI MOSI (Master Output Slave In) |
-| `PC5` (SPI SCLK) | 6 - `SCL`   |       | SPI SCLK (Serial Clock)           |
-|                  | 7 - `VDD`   | `3V3` | VDD                               |
-| `PC4`            | 8 - `CS`    |       | SPI CS/SS (Chip/Slave Select)     |
+ST7735 8-pin module
+
+![ST7735 8-Pin Module](images/ST7735_8_Pin.webp)
+
+| CH32V003         | ST7735      | Power | Description                           |
+| ---------------- | ----------- | ----- | ------------------------------------- |
+|                  | 1 - `LEDA`  |       | Connect to 3V3 via a 15-100Ω resistor |
+|                  | 2 - `GND`   | `GND` | GND                                   |
+| `PC2`            | 3 - `RESET` |       | Reset                                 |
+| `PC3`            | 4 - `RS`    |       | DC (Data / Command)                   |
+| `PC6` (SPI MOSI) | 5 - `SDA`   |       | SPI MOSI (Master Output Slave In)     |
+| `PC5` (SPI SCLK) | 6 - `SCL`   |       | SPI SCLK (Serial Clock)               |
+|                  | 7 - `VDD`   | `3V3` | VDD                                   |
+| `PC4`            | 8 - `CS`    |       | SPI CS/SS (Chip/Slave Select)         |
 
 Note: To not use CS, define the `ST7735_NO_CS` macro in `st7735.h`. Make ST7735 always enabled by pulling CS to ground.
 
@@ -159,9 +163,10 @@ void tft_init(void)
 }
 ```
 
-## Known Issue
+## Known Issues
 
 - [x] (Fixed) ~~The CS pin does not work understand PlatformIO. Pull the CS pin to ground as a temporary solution.~~
+- [x] (Fixed) ~~The draw text function creates partial text on a diagonal line from top left, I thought it is caused by hardware, it turns out I set a mistake the Y coordinate as X coordinate.~~
 
 ## CH32V003 Development Guide
 
