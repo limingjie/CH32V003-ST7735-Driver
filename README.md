@@ -78,9 +78,9 @@ Print integers.
 tft_set_color(RED);
 tft_set_background_color(BLACK);
 tft_set_cursor(2, 10);
-tft_print_number(123);
+tft_print_number(123, 0);   // Align left as the width is less thant the number.
 tft_set_cursor(2, 20);
-tft_print_number(-123);
+tft_print_number(-123, 30); // Align right as the width is greater than the number.
 ```
 
 ### Drawing
