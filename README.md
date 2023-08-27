@@ -19,8 +19,8 @@ DMA is used to accelerate the data transmission where possible.
     - [Invert Colors](#invert-colors)
   - [Known Issue](#known-issue)
   - [CH32V003 Development Guide](#ch32v003-development-guide)
-  - [License](#license)
   - [References](#references)
+  - [License](#license)
 
 ## Usage
 
@@ -167,12 +167,18 @@ void tft_init(void)
 
 [CH32V003 Development Guide](CH32V003_Dev_Guide.md)
 
-## License
-
-This work is licensed under a [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-nc-sa/4.0/).
-
 ## References
 
 - [moononournation: Arduino_GFX](https://github.com/moononournation/Arduino_GFX)
 - [Morita_Hikaru: CH32V003/Driver/CH32V003_LCD_Driver.zip](https://gitee.com/morita/ch32-v003/tree/master/Driver)
 - [E. Brombaugh: SPI OLED demonstration](https://github.com/cnlohr/ch32v003fun/tree/master/examples/spi_oled)
+
+## License
+
+![CC by-nc-sa](images/by-nc-sa.png)
+
+This work is licensed under a [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+
+- Attribution - You must give appropriate credit, provide a link to the license, and indicate if changes were made. You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.
+- NonCommercial - You may not use the material for commercial purposes.
+- ShareAlike - If you remix, transform, or build upon the material, you must distribute your contributions under the same license as the original.
