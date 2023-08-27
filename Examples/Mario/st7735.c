@@ -33,7 +33,7 @@
 // |                | 7 - VDD   | 3V3   | VDD                               |
 // | PC4            | 8 - CS    |       | SPI CS/SS (Chip/Slave Select)     |
 
-// Pin definitions
+// CH32V003 Pin Definitions
 #define PIN_RESET 2  // PC2
 #define PIN_DC    3  // PC3
 #ifndef ST7735_NO_CS
@@ -47,50 +47,71 @@
 #define RESET_HIGH()   (GPIOC->BSHR |= 1 << PIN_RESET)
 #define RESET_LOW()    (GPIOC->BCR |= 1 << PIN_RESET)
 #ifndef ST7735_NO_CS
-    #define BEGIN_WRITE() (GPIOC->BCR |= 1 << PIN_CS)   // CS Low
+    #define START_WRITE() (GPIOC->BCR |= 1 << PIN_CS)   // CS Low
     #define END_WRITE()   (GPIOC->BSHR |= 1 << PIN_CS)  // CS High
 #else
-    #define BEGIN_WRITE()
+    #define START_WRITE()
     #define END_WRITE()
 #endif
 
-#define ST7735_RST_DELAY    50   // delay ms wait for reset finish
-#define ST7735_SLPOUT_DELAY 120  // delay ms wait for sleep out finish
-
-// Commands
-#define ST7735_SLPOUT  0x11
-#define ST7735_INVOFF  0x20
-#define ST7735_INVON   0x21
-#define ST7735_NORON   0x13
-#define ST7735_DISPON  0x29
-#define ST7735_MADCTL  0x36
-#define ST7735_COLMOD  0x3A
-#define ST7735_GMCTRP1 0xE0
-#define ST7735_GMCTRN1 0xE1
-#define ST7735_CASET   0x2A
-#define ST7735_RASET   0x2B
-#define ST7735_RAMWR   0x2C
-#define ST7735_RAMRD   0x2E
-
-// Rotation & Color
-#define ST7735_MADCTL_MH  0x04
-#define ST7735_MADCTL_ML  0x10
-#define ST7735_MADCTL_MV  0x20
-#define ST7735_MADCTL_MX  0x40
-#define ST7735_MADCTL_MY  0x80
-#define ST7735_MADCTL_RGB 0x00
-#define ST7735_MADCTL_BGR 0x08
-
+// Platform IO Compatibility
 #ifdef PLATFORMIO
     #define CTLR1_SPE_Set      ((uint16_t)0x0040)
     #define GPIO_CNF_OUT_PP    0x00
     #define GPIO_CNF_OUT_PP_AF 0x08
 #endif
 
+// ST7735 Datasheet
+// https://www.displayfuture.com/Display/datasheet/controller/ST7735.pdf
+
+#define ST7735_RST_DELAY    50   // delay ms wait for reset finish
+#define ST7735_SLPOUT_DELAY 120  // delay ms wait for sleep out finish
+
+// System Function Command List - Write Commands Only
+#define ST7735_SLPIN   0x10  // Sleep IN
+#define ST7735_SLPOUT  0x11  // Sleep Out
+#define ST7735_PTLON   0x12  // Partial Display Mode On
+#define ST7735_NORON   0x13  // Normal Display Mode On
+#define ST7735_INVOFF  0x20  // Display Inversion Off
+#define ST7735_INVON   0x21  // Display Inversion On
+#define ST7735_GAMSET  0x26  // Gamma Set
+#define ST7735_DISPOFF 0x28  // Display Off
+#define ST7735_DISPON  0x29  // Display On
+#define ST7735_CASET   0x2A  // Column Address Set
+#define ST7735_RASET   0x2B  // Row Address Set
+#define ST7735_RAMWR   0x2C  // Memory Write
+#define ST7735_PLTAR   0x30  // Partial Area
+#define ST7735_TEOFF   0x34  // Tearing Effect Line Off
+#define ST7735_TEON    0x35  // Tearing Effect Line On
+#define ST7735_MADCTL  0x36  // Memory Data Access Control
+#define ST7735_IDMOFF  0x38  // Idle Mode Off
+#define ST7735_IDMON   0x39  // Idle Mode On
+#define ST7735_COLMOD  0x3A  // Interface Pixel Format
+
+// Panel Function Command List - Only Used
+#define ST7735_GMCTRP1 0xE0  // Gamma '+' polarity Correction Characteristics Setting
+#define ST7735_GMCTRN1 0xE1  // Gamma '-' polarity Correction Characteristics Setting
+
+// MADCTL Parameters
+#define ST7735_MADCTL_MH  0x04  // Bit 2 - Refresh Left to Right
+#define ST7735_MADCTL_RGB 0x00  // Bit 3 - RGB Order
+#define ST7735_MADCTL_BGR 0x08  // Bit 3 - BGR Order
+#define ST7735_MADCTL_ML  0x10  // Bit 4 - Scan Address Increase
+#define ST7735_MADCTL_MV  0x20  // Bit 5 - X-Y Exchange
+#define ST7735_MADCTL_MX  0x40  // Bit 6 - X-Mirror
+#define ST7735_MADCTL_MY  0x80  // Bit 7 - Y-Mirror
+
+// COLMOD Parameter
+#define ST7735_COLMOD_16_BPP 0x05  // 101 - 16-bit/pixel
+
+// 5x7 Font
+#define FONT_WIDTH  5  // Font width
+#define FONT_HEIGHT 7  // Font height
+
 static uint16_t _cursor_x                 = 0;
 static uint16_t _cursor_y                 = 0;      // Cursor position (x, y)
-static uint16_t _color                    = BLACK;  // Color
-static uint16_t _bg_color                 = WHITE;  // Background color
+static uint16_t _color                    = WHITE;  // Color
+static uint16_t _bg_color                 = BLACK;  // Background color
 static uint8_t  buffer[ST7735_WIDTH << 1] = {0};    // DMA buffer, long enough to fill a row.
 
 static void SPI_init(void)
@@ -202,6 +223,8 @@ static void write_data_16(uint16_t data)
     SPI_send(data);
 }
 
+// Initialization sequence from Arduino_GFX
+// https://github.com/moononournation/Arduino_GFX/blob/master/src/display/Arduino_ST7735.h
 void tft_init(void)
 {
     SPI_init();
@@ -212,7 +235,7 @@ void tft_init(void)
     RESET_HIGH();
     Delay_Ms(ST7735_RST_DELAY);
 
-    BEGIN_WRITE();
+    START_WRITE();
 
     // Out of sleep mode, no args, w/delay
     write_command_8(ST7735_SLPOUT);
@@ -225,9 +248,9 @@ void tft_init(void)
     // write_data_8(ST7735_MADCTL_MX | ST7735_MADCTL_MV | ST7735_MADCTL_BGR);  // 2 - Horizontal
     // write_data_8(ST7735_MADCTL_MX | ST7735_MADCTL_MY | ST7735_MADCTL_BGR);  // 3 - Vertical
 
-    // Set color mode, 16-bit color
+    // Set Interface Pixel Format - 16-bit/pixel
     write_command_8(ST7735_COLMOD);
-    write_data_8(0x05);
+    write_data_8(ST7735_COLMOD_16_BPP);
 
     // Gamma Adjustments (pos. polarity), 16 args.
     // (Not entirely necessary, but provides accurate colors)
@@ -294,9 +317,9 @@ void tft_print_char(char c)
     const unsigned char* start = &font[c + (c << 2)];
 
     uint16_t sz = 0;
-    for (uint8_t i = 0; i < 7; i++)
+    for (uint8_t i = 0; i < FONT_HEIGHT; i++)
     {
-        for (uint8_t j = 0; j < 5; j++)
+        for (uint8_t j = 0; j < FONT_WIDTH; j++)
         {
             if ((*(start + j)) & (0x01 << i))
             {
@@ -311,8 +334,8 @@ void tft_print_char(char c)
         }
     }
 
-    BEGIN_WRITE();
-    tft_set_window(_cursor_x, _cursor_y, _cursor_x + 4, _cursor_x + 6);
+    START_WRITE();
+    tft_set_window(_cursor_x, _cursor_y, _cursor_x + FONT_WIDTH - 1, _cursor_x + FONT_HEIGHT - 1);
     DATA_MODE();
     SPI_send_DMA(buffer, sz, 1);
     END_WRITE();
@@ -323,7 +346,7 @@ void tft_print(const char* str)
     while (*str)
     {
         tft_print_char(*str++);
-        _cursor_x += 6;
+        _cursor_x += FONT_WIDTH + 1;
     }
 }
 
@@ -370,7 +393,7 @@ void tft_draw_pixel(uint16_t x, uint16_t y, uint16_t color)
 {
     x += ST7735_X_OFFSET;
     y += ST7735_Y_OFFSET;
-    BEGIN_WRITE();
+    START_WRITE();
     tft_set_window(x, y, x, y);
     write_data_16(color);
     END_WRITE();
@@ -388,7 +411,7 @@ void tft_fill_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint
         buffer[sz++] = color;
     }
 
-    BEGIN_WRITE();
+    START_WRITE();
     tft_set_window(x, y, x + width - 1, y + height - 1);
     DATA_MODE();
     SPI_send_DMA(buffer, sz, height);
@@ -399,7 +422,7 @@ void tft_draw_bitmap(uint16_t x, uint16_t y, uint16_t width, uint16_t height, co
 {
     x += ST7735_X_OFFSET;
     y += ST7735_Y_OFFSET;
-    BEGIN_WRITE();
+    START_WRITE();
     tft_set_window(x, y, x + width - 1, y + height - 1);
     DATA_MODE();
     SPI_send_DMA(bitmap, width * height << 1, 1);
@@ -421,7 +444,7 @@ static void _tft_draw_fast_v_line(int16_t x, int16_t y, int16_t h, uint16_t colo
         buffer[sz++] = color;
     }
 
-    BEGIN_WRITE();
+    START_WRITE();
     tft_set_window(x, y, x, y + h - 1);
     DATA_MODE();
     SPI_send_DMA(buffer, sz, 1);
@@ -440,7 +463,7 @@ static void _tft_draw_fast_h_line(int16_t x, int16_t y, int16_t w, uint16_t colo
         buffer[sz++] = color;
     }
 
-    BEGIN_WRITE();
+    START_WRITE();
     tft_set_window(x, y, x + w - 1, y);
     DATA_MODE();
     SPI_send_DMA(buffer, sz, 1);
