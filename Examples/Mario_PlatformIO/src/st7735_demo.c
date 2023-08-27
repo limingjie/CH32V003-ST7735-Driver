@@ -11,7 +11,12 @@
  *  - GitHub: https://github.com/limingjie/
  */
 
-#include "debug.h"
+#ifdef PLATFORMIO
+    #include <debug.h>
+#else
+    #include "ch32v003fun.h"
+#endif
+
 #include "st7735.h"
 
 #include <stdint.h>
@@ -609,7 +614,13 @@ animation_frame frames[] = {
 
 int main(void)
 {
+#ifdef PLATFORMIO
     Delay_Init();
+#else
+    SystemInit();
+    Delay_Ms(100);
+#endif
+
     tft_init();
 
     tft_set_background_color(BLACK);
@@ -640,7 +651,7 @@ int main(void)
         tft_set_color(WHITE);
         tft_set_cursor(124, 70);
         tft_print("Frames");
-        tft_set_cursor(55, 70);
+        tft_set_cursor(52, 70);
         tft_print_number(count++);
 
         p_frame = &frames[frame];
