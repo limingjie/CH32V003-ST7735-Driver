@@ -1,37 +1,46 @@
-/*
- * ST7735 Driver for CH32V003
- *
- * Reference:
- *  - https://github.com/moononournation/Arduino_GFX
- *  - https://gitee.com/morita/ch32-v003/tree/master/Driver
- *  - https://github.com/cnlohr/ch32v003fun/tree/master/examples/spi_oled
- *
- * Aug 2023 by Li Mingjie
- *  - Email:  limingjie@outlook.com
- *  - GitHub: https://github.com/limingjie/
- */
+/// \brief ST7735 Driver for CH32V003
+///
+/// \author Li Mingjie
+///  - Email:  limingjie@outlook.com
+///  - GitHub: https://github.com/limingjie/
+///
+/// \date Aug 2023
+///
+/// \section References
+///  - https://github.com/moononournation/Arduino_GFX
+///  - https://gitee.com/morita/ch32-v003/tree/master/Driver
+///  - https://github.com/cnlohr/ch32v003fun/tree/master/examples/spi_oled
+///
+/// \copyright Attribution-NonCommercial-ShareAlike 4.0 (CC BY-NC-SA 4.0)
+///  - Attribution - You must give appropriate credit, provide a link to the
+///    license, and indicate if changes were made. You may do so in any
+///    reasonable manner, but not in any way that suggests the licensor endorses
+///    you or your use.
+///  - NonCommercial - You may not use the material for commercial purposes.
+///  - ShareAlike - If you remix, transform, or build upon the material, you
+///    must distribute your contributions under the same license as the original.
+///
+/// \section Wiring
+/// | CH32V003       | ST7735    | Power | Description                       |
+/// | -------------- | --------- | ----- | --------------------------------- |
+/// |                | 1 - LEDA  | 3V3   | Use PWM to control brightness     |
+/// |                | 2 - GND   | GND   | GND                               |
+/// | PC2            | 3 - RESET |       | Reset                             |
+/// | PC3            | 4 - RS    |       | DC (Data / Command)               |
+/// | PC6 (SPI MOSI) | 5 - SDA   |       | SPI MOSI (Master Output Slave In) |
+/// | PC5 (SPI SCLK) | 6 - SCL   |       | SPI SCLK (Serial Clock)           |
+/// |                | 7 - VDD   | 3V3   | VDD                               |
+/// | PC4            | 8 - CS    |       | SPI CS/SS (Chip/Slave Select)     |
 
 #include "st7735.h"
 
-#ifdef PLATFORMIO
+#ifdef PLATFORMIO  // Use PlatformIO CH32V
     #include <debug.h>
-#else
+#else  // Use ch32v003fun
     #include "ch32v003fun.h"
 #endif
 
 #include "font5x7.h"
-
-// Wiring
-// | CH32V003       | ST7735    | Power | Description                       |
-// | -------------- | --------- | ----- | --------------------------------- |
-// |                | 1 - LEDA  | 3V3   | Use PWM to control brightness     |
-// |                | 2 - GND   | GND   | GND                               |
-// | PC2            | 3 - RESET |       | Reset                             |
-// | PC3            | 4 - RS    |       | DC (Data / Command)               |
-// | PC6 (SPI MOSI) | 5 - SDA   |       | SPI MOSI (Master Output Slave In) |
-// | PC5 (SPI SCLK) | 6 - SCL   |       | SPI SCLK (Serial Clock)           |
-// |                | 7 - VDD   | 3V3   | VDD                               |
-// | PC4            | 8 - CS    |       | SPI CS/SS (Chip/Slave Select)     |
 
 // CH32V003 Pin Definitions
 #define PIN_RESET 2  // PC2
@@ -54,7 +63,7 @@
     #define END_WRITE()
 #endif
 
-// Platform IO Compatibility
+// PlatformIO Compatibility
 #ifdef PLATFORMIO
     #define CTLR1_SPE_Set      ((uint16_t)0x0040)
     #define GPIO_CNF_OUT_PP    0x00
@@ -63,7 +72,7 @@
 
 // ST7735 Datasheet
 // https://www.displayfuture.com/Display/datasheet/controller/ST7735.pdf
-
+// Delays
 #define ST7735_RST_DELAY    50   // delay ms wait for reset finish
 #define ST7735_SLPOUT_DELAY 120  // delay ms wait for sleep out finish
 
@@ -108,12 +117,14 @@
 #define FONT_WIDTH  5  // Font width
 #define FONT_HEIGHT 7  // Font height
 
-static uint16_t _cursor_x                 = 0;
-static uint16_t _cursor_y                 = 0;      // Cursor position (x, y)
-static uint16_t _color                    = WHITE;  // Color
-static uint16_t _bg_color                 = BLACK;  // Background color
-static uint8_t  buffer[ST7735_WIDTH << 1] = {0};    // DMA buffer, long enough to fill a row.
+static uint16_t _cursor_x                  = 0;
+static uint16_t _cursor_y                  = 0;      // Cursor position (x, y)
+static uint16_t _color                     = WHITE;  // Color
+static uint16_t _bg_color                  = BLACK;  // Background color
+static uint8_t  _buffer[ST7735_WIDTH << 1] = {0};    // DMA buffer, long enough to fill a row.
 
+/// \brief Initialize ST7735
+/// \details Configure SPI, DMA, and RESET/DC/CS lines.
 static void SPI_init(void)
 {
     // Enable GPIO Port C and SPI peripheral
@@ -169,7 +180,10 @@ static void SPI_init(void)
     DMA1_Channel3->PADDR = (uint32_t)&SPI1->DATAR;
 }
 
-// Send data through SPI DMA
+/// \brief Send Data Through SPI via DMA
+/// \param buffer Memory address
+/// \param size Memory size
+/// \param repeat Repeat times
 static void SPI_send_DMA(const uint8_t* buffer, uint16_t size, uint16_t repeat)
 {
     DMA1_Channel3->MADDR = (uint32_t)buffer;
@@ -190,8 +204,9 @@ static void SPI_send_DMA(const uint8_t* buffer, uint16_t size, uint16_t repeat)
     DMA1_Channel3->CFGR &= ~DMA_CFGR1_EN;  // Turn off channel
 }
 
-// Send data directly through SPI
-static inline void SPI_send(uint8_t data)
+/// \brief Send Data Directly Through SPI
+/// \param data 8-bit data
+static void SPI_send(uint8_t data)
 {
     // Send byte
     SPI1->DATAR = data;
@@ -201,21 +216,24 @@ static inline void SPI_send(uint8_t data)
         ;
 }
 
-// Write command
+/// \brief Send 8-Bit Command
+/// \param cmd 8-bit command
 static void write_command_8(uint8_t cmd)
 {
     COMMAND_MODE();
     SPI_send(cmd);
 }
 
-// Write 8-bit data
+/// \brief Send 8-Bit Data
+/// \param cmd 8-bit data
 static void write_data_8(uint8_t data)
 {
     DATA_MODE();
     SPI_send(data);
 }
 
-// Write 16-bit data
+/// \brief Send 16-Bit Data
+/// \param cmd 16-bit data
 static void write_data_16(uint16_t data)
 {
     DATA_MODE();
@@ -223,8 +241,9 @@ static void write_data_16(uint16_t data)
     SPI_send(data);
 }
 
-// Initialization sequence from Arduino_GFX
-// https://github.com/moononournation/Arduino_GFX/blob/master/src/display/Arduino_ST7735.h
+/// \brief Initialize ST7735
+/// \details Initialization sequence from Arduino_GFX
+/// https://github.com/moononournation/Arduino_GFX/blob/master/src/display/Arduino_ST7735.h
 void tft_init(void)
 {
     SPI_init();
@@ -285,22 +304,37 @@ void tft_init(void)
     END_WRITE();
 }
 
+/// \brief Set Cursor Position for Print Functions
+/// \param x X coordinate, from left to right.
+/// \param y Y coordinate, from top to bottom.
+/// \details Calculate offset and set to `_cursor_x` and `_cursor_y` variables
 void tft_set_cursor(uint16_t x, uint16_t y)
 {
     _cursor_x = x + ST7735_X_OFFSET;
     _cursor_y = y + ST7735_Y_OFFSET;
 }
 
+/// \brief Set Text Color
+/// \param color Text color
+/// \details Set to `_color` variable
 void tft_set_color(uint16_t color)
 {
     _color = color;
 }
 
+/// \brief Set Text Background Color
+/// \param color Text background color
+/// \details Set to `_bg_color` variable
 void tft_set_background_color(uint16_t color)
 {
     _bg_color = color;
 }
 
+/// \brief Set Memory Write Window
+/// \param x0 Start column
+/// \param y0 Start row
+/// \param x1 End column
+/// \param y1 End row
 static void tft_set_window(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
 {
     write_command_8(ST7735_CASET);
@@ -312,6 +346,9 @@ static void tft_set_window(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
     write_command_8(ST7735_RAMWR);
 }
 
+/// \brief Print a Character
+/// \param c Character to print
+/// \details DMA accelerated.
 void tft_print_char(char c)
 {
     const unsigned char* start = &font[c + (c << 2)];
@@ -323,13 +360,13 @@ void tft_print_char(char c)
         {
             if ((*(start + j)) & (0x01 << i))
             {
-                buffer[sz++] = _color >> 8;
-                buffer[sz++] = _color;
+                _buffer[sz++] = _color >> 8;
+                _buffer[sz++] = _color;
             }
             else
             {
-                buffer[sz++] = _bg_color >> 8;
-                buffer[sz++] = _bg_color;
+                _buffer[sz++] = _bg_color >> 8;
+                _buffer[sz++] = _bg_color;
             }
         }
     }
@@ -337,10 +374,12 @@ void tft_print_char(char c)
     START_WRITE();
     tft_set_window(_cursor_x, _cursor_y, _cursor_x + FONT_WIDTH - 1, _cursor_x + FONT_HEIGHT - 1);
     DATA_MODE();
-    SPI_send_DMA(buffer, sz, 1);
+    SPI_send_DMA(_buffer, sz, 1);
     END_WRITE();
 }
 
+/// \brief Print a String
+/// \param str String to print
 void tft_print(const char* str)
 {
     while (*str)
@@ -350,6 +389,8 @@ void tft_print(const char* str)
     }
 }
 
+/// \brief Print an Integer
+/// \param num Number to print
 void tft_print_number(int32_t num)
 {
     static char str[12];
@@ -389,6 +430,11 @@ void tft_print_number(int32_t num)
     tft_print(str);
 }
 
+/// \brief Draw a Pixel
+/// \param x X
+/// \param y Y
+/// \param color Pixel color
+/// \details SPI direct write
 void tft_draw_pixel(uint16_t x, uint16_t y, uint16_t color)
 {
     x += ST7735_X_OFFSET;
@@ -399,6 +445,13 @@ void tft_draw_pixel(uint16_t x, uint16_t y, uint16_t color)
     END_WRITE();
 }
 
+/// \brief Fill a Rectangle Area
+/// \param x Start X coordinate
+/// \param y Start Y coordinate
+/// \param width Width
+/// \param height Height
+/// \param color Fill Color
+/// \details DMA accelerated.
 void tft_fill_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t color)
 {
     x += ST7735_X_OFFSET;
@@ -407,17 +460,23 @@ void tft_fill_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint
     uint16_t sz = 0;
     for (uint16_t x = 0; x < width; x++)
     {
-        buffer[sz++] = color >> 8;
-        buffer[sz++] = color;
+        _buffer[sz++] = color >> 8;
+        _buffer[sz++] = color;
     }
 
     START_WRITE();
     tft_set_window(x, y, x + width - 1, y + height - 1);
     DATA_MODE();
-    SPI_send_DMA(buffer, sz, height);
+    SPI_send_DMA(_buffer, sz, height);
     END_WRITE();
 }
 
+/// \brief Draw a Bitmap
+/// \param x Start X coordinate
+/// \param y Start Y coordinate
+/// \param width Width
+/// \param height Height
+/// \param bitmap Bitmap
 void tft_draw_bitmap(uint16_t x, uint16_t y, uint16_t width, uint16_t height, const uint8_t* bitmap)
 {
     x += ST7735_X_OFFSET;
@@ -429,9 +488,13 @@ void tft_draw_bitmap(uint16_t x, uint16_t y, uint16_t width, uint16_t height, co
     END_WRITE();
 }
 
-// The draw line fuctions from Arduino GFX
-// - https://github.com/moononournation/Arduino_GFX/blob/master/src/Arduino_GFX.cpp
-// Some functions are DMA accelerated.
+/// \brief Draw a Vertical Line Fast
+/// \param x0 Start X coordinate
+/// \param y0 Start Y coordinate
+/// \param x1 End X coordinate
+/// \param y1 End Y coordinate
+/// \param color Line color
+/// \details DMA accelerated
 static void _tft_draw_fast_v_line(int16_t x, int16_t y, int16_t h, uint16_t color)
 {
     x += ST7735_X_OFFSET;
@@ -440,17 +503,24 @@ static void _tft_draw_fast_v_line(int16_t x, int16_t y, int16_t h, uint16_t colo
     uint16_t sz = 0;
     for (int16_t j = 0; j < h; j++)
     {
-        buffer[sz++] = color >> 8;
-        buffer[sz++] = color;
+        _buffer[sz++] = color >> 8;
+        _buffer[sz++] = color;
     }
 
     START_WRITE();
     tft_set_window(x, y, x, y + h - 1);
     DATA_MODE();
-    SPI_send_DMA(buffer, sz, 1);
+    SPI_send_DMA(_buffer, sz, 1);
     END_WRITE();
 }
 
+/// \brief Draw a Horizontal Line Fast
+/// \param x0 Start X coordinate
+/// \param y0 Start Y coordinate
+/// \param x1 End X coordinate
+/// \param y1 End Y coordinate
+/// \param color Line color
+/// \details DMA accelerated
 static void _tft_draw_fast_h_line(int16_t x, int16_t y, int16_t w, uint16_t color)
 {
     x += ST7735_X_OFFSET;
@@ -459,14 +529,14 @@ static void _tft_draw_fast_h_line(int16_t x, int16_t y, int16_t w, uint16_t colo
     uint16_t sz = 0;
     for (int16_t j = 0; j < w; j++)
     {
-        buffer[sz++] = color >> 8;
-        buffer[sz++] = color;
+        _buffer[sz++] = color >> 8;
+        _buffer[sz++] = color;
     }
 
     START_WRITE();
     tft_set_window(x, y, x + w - 1, y);
     DATA_MODE();
-    SPI_send_DMA(buffer, sz, 1);
+    SPI_send_DMA(_buffer, sz, 1);
     END_WRITE();
 }
 
@@ -479,7 +549,15 @@ static void _tft_draw_fast_h_line(int16_t x, int16_t y, int16_t w, uint16_t colo
         b         = t;      \
     }
 
-static void _tft_draw_line(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color)
+/// \brief Bresenham's line algorithm from Arduino GFX
+/// https://github.com/moononournation/Arduino_GFX/blob/master/src/Arduino_GFX.cpp
+/// \param x0 Start X coordinate
+/// \param y0 Start Y coordinate
+/// \param x1 End X coordinate
+/// \param y1 End Y coordinate
+/// \param color Line color
+/// \details SPI direct write
+static void _tft_draw_line_bresenham(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color)
 {
     uint8_t steep = _diff(y1, y0) > _diff(x1, x0);
     if (steep)
@@ -518,6 +596,12 @@ static void _tft_draw_line(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint1
     }
 }
 
+/// \brief Draw a Rectangle
+/// \param x0 Start X coordinate
+/// \param y0 Start Y coordinate
+/// \param x1 End X coordinate
+/// \param y1 End Y coordinate
+/// \param color Line color
 void tft_draw_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t color)
 {
     _tft_draw_fast_h_line(x, y, width, color);
@@ -526,6 +610,13 @@ void tft_draw_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint
     _tft_draw_fast_v_line(x + width - 1, y, height, color);
 }
 
+/// \brief Draw Line Function from Arduino GFX
+/// https://github.com/moononournation/Arduino_GFX/blob/master/src/Arduino_GFX.cpp
+/// \param x0 Start X coordinate
+/// \param y0 Start Y coordinate
+/// \param x1 End X coordinate
+/// \param y1 End Y coordinate
+/// \param color Line color
 void tft_draw_line(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color)
 {
     if (x0 == x1)
@@ -546,6 +637,6 @@ void tft_draw_line(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t colo
     }
     else
     {
-        _tft_draw_line(x0, y0, x1, y1, color);
+        _tft_draw_line_bresenham(x0, y0, x1, y1, color);
     }
 }

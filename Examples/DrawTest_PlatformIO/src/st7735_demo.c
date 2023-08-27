@@ -1,17 +1,43 @@
-/*
- * ST7735 Driver for CH32V003 - Demo
- *
- * Reference:
- *  - https://github.com/moononournation/Arduino_GFX
- *  - https://gitee.com/morita/ch32-v003/tree/master/Driver
- *  - https://github.com/cnlohr/ch32v003fun/tree/master/examples/spi_oled
- *
- * Aug 2023 by Li Mingjie
- *  - Email:  limingjie@outlook.com
- *  - GitHub: https://github.com/limingjie/
- */
+/// \brief ST7735 Driver for CH32V003 - Demo
+///
+/// \author Li Mingjie
+///  - Email:  limingjie@outlook.com
+///  - GitHub: https://github.com/limingjie/
+///
+/// \date Aug 2023
+///
+/// \section References
+///  - https://github.com/moononournation/Arduino_GFX
+///  - https://gitee.com/morita/ch32-v003/tree/master/Driver
+///  - https://github.com/cnlohr/ch32v003fun/tree/master/examples/spi_oled
+///
+/// \copyright Attribution-NonCommercial-ShareAlike 4.0 (CC BY-NC-SA 4.0)
+///  - Attribution - You must give appropriate credit, provide a link to the
+///    license, and indicate if changes were made. You may do so in any
+///    reasonable manner, but not in any way that suggests the licensor endorses
+///    you or your use.
+///  - NonCommercial - You may not use the material for commercial purposes.
+///  - ShareAlike - If you remix, transform, or build upon the material, you
+///    must distribute your contributions under the same license as the original.
+///
+/// \section Wiring
+/// | CH32V003       | ST7735    | Power | Description                       |
+/// | -------------- | --------- | ----- | --------------------------------- |
+/// |                | 1 - LEDA  | 3V3   | Use PWM to control brightness     |
+/// |                | 2 - GND   | GND   | GND                               |
+/// | PC2            | 3 - RESET |       | Reset                             |
+/// | PC3            | 4 - RS    |       | DC (Data / Command)               |
+/// | PC6 (SPI MOSI) | 5 - SDA   |       | SPI MOSI (Master Output Slave In) |
+/// | PC5 (SPI SCLK) | 6 - SCL   |       | SPI SCLK (Serial Clock)           |
+/// |                | 7 - VDD   | 3V3   | VDD                               |
+/// | PC4            | 8 - CS    |       | SPI CS/SS (Chip/Slave Select)     |
 
-#include "debug.h"
+#ifdef PLATFORMIO  // Use PlatformIO CH32V
+    #include <debug.h>
+#else  // Use ch32v003fun
+    #include "ch32v003fun.h"
+#endif
+
 #include "st7735.h"
 
 #include <stdint.h>
@@ -34,7 +60,13 @@ void popup(const char *msg, uint32_t delay)
 
 int main(void)
 {
+#ifdef PLATFORMIO  // Use PlatformIO CH32V
     Delay_Init();
+#else  // Use ch32v003fun
+    SystemInit();
+    Delay_Ms(100);
+#endif
+
     tft_init();
 
     uint32_t frame = 0;
