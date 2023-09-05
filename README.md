@@ -1,6 +1,6 @@
 # CH32V003 ST7735 Driver
 
-A minimal ST7735 LCD driver for CH32V003 that supports both [ch32v003fun](https://github.com/cnlohr/ch32v003fun) and [PlatformIO CH32V](https://github.com/Community-PIO-CH32V/platform-ch32v). It should also work in [MounRiver Stdio](http://www.mounriver.com/).
+A minimal ST7735 LCD driver for CH32V003 that supports both [ch32v003fun](https://github.com/cnlohr/ch32v003fun) and [PlatformIO CH32V](https://github.com/Community-PIO-CH32V/platform-ch32v). It should also work in [MounRiver Studio](http://www.mounriver.com/).
 
 DMA is used to accelerate the data transmission where possible.
 
